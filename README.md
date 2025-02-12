@@ -1,31 +1,53 @@
 # Git Hooks Setup
 
-This repository includes a script to set up local Git hooks. The script creates a `hooks` directory, configures symbolic links to `.git/hooks`, and ensures proper integration with Git LFS.
+## Stop Writing Hook Setup Docs! 🚀
+
+Tired of writing documentation on how to set up Git hooks? Make them part of your repository and just tell your team to run a script!
+
+## Problem Statement
+
+Git does not allow committing the `.git/hooks` directory, making it difficult to share project-specific hooks among team members. This script ensures that hooks are stored in a version-controlled `hooks` directory and automatically linked to `.git/hooks`, so everyone can set them up in seconds.
 
 ## Installation
 
 1. Clone this repository (or navigate to your existing repo).
-
 2. Run the setup script using Python:
-
+   
    ```sh
-   python script.py
+   python git_common_hooks.py
    ```
 
    If you want to explicitly create hooks or set up symbolic links separately:
-
+   
    ```sh
-   python script.py --mode create   # Only create hooks
-   python script.py --mode setup    # Only set up symbolic links
+   python git_common_hooks.py --mode create   # Only create hooks
+   python git_common_hooks.py --mode setup    # Only set up symbolic links
    ```
 
 3. The script will:
-
    - Create a `hooks` directory in the repository root.
    - Set up default Git hooks (`post-checkout`, `post-commit`, `post-merge`, `pre-push`).
    - Add a `functions.sh` file to handle local hook execution.
    - Add `hooks/local` to `.gitignore` to prevent accidental commits.
    - If `.git/hooks` exists, it will be backed up before creating a symbolic link.
+
+## Custom Options
+
+- **Specify a custom hooks directory:**
+  
+  If you want to use a different directory for hooks, specify it with `--directory`:
+  
+  ```sh
+  python git_common_hooks.py --directory my_hooks
+  ```
+
+- **Reset existing hooks:**
+  
+  If hooks already exist and you want to overwrite them, use the `--reset` flag:
+  
+  ```sh
+  python git_common_hooks.py --reset
+  ```
 
 ## Default Hooks
 
