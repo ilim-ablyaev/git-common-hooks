@@ -54,10 +54,10 @@ def create_hooks(hooks_dir, reset):
         "  command -v git-lfs >/dev/null 2>&1 || { echo >&2 \"\nThis repository is configured for Git LFS but 'git-lfs' "
         "was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the '$0' file "
         "in the hooks directory (set by 'core.hookspath'; usually '.git/hooks').\n\"; exit 2; }\n"
-        "  git lfs $0 \"$@\"\n"
+        "  git lfs $(basename $0) \"$@\"\n"
         "fi\n"
     )
-    source_local_hook = "source $(dirname $0)/functions.sh\nrun_local_hook\n"
+    source_local_hook = "\necho \"Running local hook...\"\nsource $(dirname $0)/functions.sh\nrun_local_hook\n"
 
     all_hooks = [
         "applypatch-msg", "commit-msg", "fsmonitor-watchman", "post-update", "pre-applypatch", "pre-commit",
@@ -73,14 +73,15 @@ def create_hooks(hooks_dir, reset):
     }
 
     for hook in all_hooks:
-        hook_path = os.path.join(git_hooks_dir, hook)
-        existing_content = read_existing_hook(hook_path)
+        old_hook_path = os.path.join(git_hooks_dir, hook)
+        existing_content = "" if reset else read_existing_hook(old_hook_path)
 
         if existing_content:
             content = f"{existing_content}\n{source_local_hook}"
         else:
             content = default_hooks.get(hook, f"{script_header}{source_local_hook}")
 
+        hook_path = os.path.join(hooks_dir, hook)
         if not os.path.exists(hook_path) or reset:
             with open(hook_path, "w") as f:
                 f.write(content)
@@ -98,6 +99,7 @@ def create_local_hooks(directory, reset):
     create_hooks(hooks_dir, reset)
 
     print(f"Created hooks directory at: {hooks_dir} with all Git hooks.")
+    print("\n✨ Git Hooks setup complete! ✨")
 
 def setup_local_hooks(directory):
     repo_root = get_repo_root()
@@ -108,13 +110,22 @@ def setup_local_hooks(directory):
         print(f"Hooks directory '{project_hooks_dir}' not found.")
         sys.exit(1)
 
-    if os.path.exists(git_hooks_dir) and not os.path.islink(git_hooks_dir):
+    if os.path.islink(git_hooks_dir):
+        if os.readlink(git_hooks_dir) != project_hooks_dir:
+            backup_dir = os.path.join(repo_root, ".git", f"hooks_backup_{int(os.path.getmtime(git_hooks_dir))}")
+            shutil.move(git_hooks_dir, backup_dir)
+            print(f"Existing .git/hooks symlink backed up to: {backup_dir}")
+            os.symlink(project_hooks_dir, git_hooks_dir)
+            print(f"Git hooks directory updated to link to: {project_hooks_dir}")
+    elif os.path.exists(git_hooks_dir):
         backup_dir = os.path.join(repo_root, ".git", f"hooks_backup_{int(os.path.getmtime(git_hooks_dir))}")
         shutil.move(git_hooks_dir, backup_dir)
         print(f"Existing .git/hooks directory backed up to: {backup_dir}")
-
-    os.symlink(project_hooks_dir, git_hooks_dir)
-    print(f"Git hooks directory is now linked to: {project_hooks_dir}")
+        os.symlink(project_hooks_dir, git_hooks_dir)
+        print(f"Git hooks directory is now linked to: {project_hooks_dir}")
+    else:
+        os.symlink(project_hooks_dir, git_hooks_dir)
+        print(f"Git hooks directory is now linked to: {project_hooks_dir}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -127,3 +138,5 @@ if __name__ == "__main__":
         create_local_hooks(args.directory, args.reset)
     if args.mode == "setup" or args.mode is None:
         setup_local_hooks(args.directory)
+
+    print("Thanks for using this script! Created by Ilimdar Abliaev (https://github.com/ilim-ablyaev). Happy coding! 🚀")
