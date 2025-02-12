@@ -1,3 +1,17 @@
+# Git Common Hooks Script
+# Author: Ilimdar Abliaev
+# GitHub: https://github.com/ilim-ablyaev
+# License: MIT
+#
+# Description:
+# This script automates the setup of Git hooks in a repository, allowing developers
+# to enforce custom hooks easily. It ensures hooks are properly created, backs up
+# existing ones, and links the hooks directory within the Git repository.
+#
+# Usage:
+# Run the script with --mode create to generate the hooks, or --mode setup to
+# link the hooks directory. Use --reset to overwrite existing hooks.
+
 import os
 import sys
 import argparse
