@@ -39,7 +39,16 @@ def create_local_example_hook(local_dir, reset):
             f.write("#!/bin/sh\necho \"Example post-checkout hook! Happy coding\"\n")
         os.chmod(local_post_checkout, 0o755)
 
+def read_existing_hook(hook_path):
+    if os.path.exists(hook_path):
+        with open(hook_path, "r") as f:
+            return f.read().strip()
+    return ""
+
 def create_hooks(hooks_dir, reset):
+    script_header = "#!/bin/sh\n"
+    git_hooks_dir = os.path.join(get_repo_root(), ".git", "hooks")
+
     git_lfs_check = (
         "if git config --get filter.lfs.required >/dev/null 2>&1; then\n"
         "  command -v git-lfs >/dev/null 2>&1 || { echo >&2 \"\nThis repository is configured for Git LFS but 'git-lfs' "
@@ -57,15 +66,20 @@ def create_hooks(hooks_dir, reset):
     ]
 
     default_hooks = {
-        "post-checkout": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}",
-        "post-commit": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}",
-        "post-merge": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}",
-        "pre-push": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}"
+        "post-checkout": f"{script_header}{git_lfs_check}\n{source_local_hook}",
+        "post-commit": f"{script_header}{git_lfs_check}\n{source_local_hook}",
+        "post-merge": f"{script_header}{git_lfs_check}\n{source_local_hook}",
+        "pre-push": f"{script_header}{git_lfs_check}\n{source_local_hook}"
     }
 
     for hook in all_hooks:
-        hook_path = os.path.join(hooks_dir, hook)
-        content = default_hooks.get(hook, f"#!/bin/sh\n{source_local_hook}")
+        hook_path = os.path.join(git_hooks_dir, hook)
+        existing_content = read_existing_hook(hook_path)
+
+        if existing_content:
+            content = f"{existing_content}\n{source_local_hook}"
+        else:
+            content = default_hooks.get(hook, f"{script_header}{source_local_hook}")
 
         if not os.path.exists(hook_path) or reset:
             with open(hook_path, "w") as f:
