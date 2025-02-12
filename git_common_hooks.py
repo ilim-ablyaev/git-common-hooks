@@ -3,18 +3,19 @@ import sys
 import argparse
 import shutil
 
-def create_local_hooks(directory, reset):
+def get_repo_root():
     repo_root = os.popen("git rev-parse --show-toplevel").read().strip()
     if not repo_root:
         print("Not a Git repository.")
         sys.exit(1)
+    return repo_root
 
-    hooks_dir = directory or os.path.join(repo_root, "hooks")
-    local_dir = os.path.join(hooks_dir, "local")
-    os.makedirs(local_dir, exist_ok=True)
+def ensure_directory_exists(path):
+    os.makedirs(path, exist_ok=True)
 
+def setup_gitignore(repo_root, hooks_dir):
     gitignore_path = os.path.join(repo_root, ".gitignore")
-    gitignore_entry = "hooks/local\n"
+    gitignore_entry = f"{hooks_dir}/local\n"
 
     if not os.path.exists(gitignore_path):
         with open(gitignore_path, "w") as f:
@@ -25,43 +26,67 @@ def create_local_hooks(directory, reset):
             if gitignore_entry.strip() not in content:
                 f.write(f"\n{gitignore_entry}")
 
+def create_functions_sh(hooks_dir, reset):
     functions_sh = os.path.join(hooks_dir, "functions.sh")
     if not os.path.exists(functions_sh) or reset:
         with open(functions_sh, "w") as f:
             f.write("function run_local_hook() {\n  local_hook=$(dirname $0)/local/$(basename $0)\n  test -f $local_hook && $local_hook \"$@\" || true\n}\n")
 
+def create_local_example_hook(local_dir, reset):
     local_post_checkout = os.path.join(local_dir, "post-checkout")
     if not os.path.exists(local_post_checkout) or reset:
         with open(local_post_checkout, "w") as f:
             f.write("#!/bin/sh\necho \"Example post-checkout hook! Happy coding\"\n")
         os.chmod(local_post_checkout, 0o755)
 
-    git_lfs_check = "command -v git-lfs >/dev/null 2>&1 || { echo >&2 \"\nThis repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the '$0' file in the hooks directory (set by 'core.hookspath'; usually '.git/hooks').\n\"; exit 2; }\n"
-    git_lfs_command = "git lfs $0 \"$@\"\n"
+def create_hooks(hooks_dir, reset):
+    git_lfs_check = (
+        "if git config --get filter.lfs.required >/dev/null 2>&1; then\n"
+        "  command -v git-lfs >/dev/null 2>&1 || { echo >&2 \"\nThis repository is configured for Git LFS but 'git-lfs' "
+        "was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the '$0' file "
+        "in the hooks directory (set by 'core.hookspath'; usually '.git/hooks').\n\"; exit 2; }\n"
+        "  git lfs $0 \"$@\"\n"
+        "fi\n"
+    )
     source_local_hook = "source $(dirname $0)/functions.sh\nrun_local_hook\n"
 
+    all_hooks = [
+        "applypatch-msg", "commit-msg", "fsmonitor-watchman", "post-update", "pre-applypatch", "pre-commit",
+        "pre-merge-commit", "pre-push", "pre-rebase", "pre-receive", "prepare-commit-msg", "push-to-checkout", "update",
+        "post-checkout", "post-commit", "post-merge"
+    ]
+
     default_hooks = {
-        "post-checkout": f"#!/bin/sh\n{git_lfs_check}\n{git_lfs_command.format('$0')}\n{source_local_hook}",
-        "post-commit": f"#!/bin/sh\n{git_lfs_command.format('post-commit')}\n{source_local_hook}",
-        "post-merge": f"#!/bin/sh\n{git_lfs_check}\n{git_lfs_command.format('$0')}\n{source_local_hook}",
-        "pre-push": f"#!/bin/sh\n{git_lfs_check}\n{git_lfs_command.format('$0')}\n{source_local_hook}"
+        "post-checkout": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}",
+        "post-commit": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}",
+        "post-merge": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}",
+        "pre-push": f"#!/bin/sh\n{git_lfs_check}\n{source_local_hook}"
     }
 
-    for hook, content in default_hooks.items():
+    for hook in all_hooks:
         hook_path = os.path.join(hooks_dir, hook)
+        content = default_hooks.get(hook, f"#!/bin/sh\n{source_local_hook}")
+
         if not os.path.exists(hook_path) or reset:
             with open(hook_path, "w") as f:
                 f.write(content)
             os.chmod(hook_path, 0o755)
 
-    print(f"Created local hooks directory at: {local_dir}")
+def create_local_hooks(directory, reset):
+    repo_root = get_repo_root()
+    hooks_dir = directory or os.path.join(repo_root, "hooks")
+    local_dir = os.path.join(hooks_dir, "local")
+
+    ensure_directory_exists(local_dir)
+    setup_gitignore(repo_root, hooks_dir)
+    create_functions_sh(hooks_dir, reset)
+    create_local_example_hook(local_dir, reset)
+    create_hooks(hooks_dir, reset)
+
+    print(f"Created hooks directory at: {hooks_dir} with all Git hooks.")
 
 def setup_local_hooks(directory):
-    repo_root = os.popen("git rev-parse --show-toplevel").read().strip()
-    if not repo_root:
-        print("Not a Git repository.")
-        sys.exit(1)
-
+    repo_root = get_repo_root()
     git_hooks_dir = os.path.join(repo_root, ".git", "hooks")
     project_hooks_dir = directory or os.path.join(repo_root, "hooks")
 
