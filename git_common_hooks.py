@@ -29,7 +29,7 @@ def ensure_directory_exists(path):
 
 def setup_gitignore(repo_root, hooks_dir):
     gitignore_path = os.path.join(repo_root, ".gitignore")
-    gitignore_entry = f"{hooks_dir}/local\n"
+    gitignore_entry = f"/{os.path.relpath(hooks_dir, repo_root)}/local"
 
     if not os.path.exists(gitignore_path):
         with open(gitignore_path, "w") as f:
@@ -38,7 +38,7 @@ def setup_gitignore(repo_root, hooks_dir):
         with open(gitignore_path, "r+") as f:
             content = f.read()
             if gitignore_entry.strip() not in content:
-                f.write(f"\n{gitignore_entry}")
+                f.write(f"\n{gitignore_entry}\n")
 
 def create_functions_sh(hooks_dir, reset):
     functions_sh = os.path.join(hooks_dir, "functions.sh")
